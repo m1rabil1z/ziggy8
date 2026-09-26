@@ -1,0 +1,3 @@
+clibs/
+zig-out/
+.zig-cache/
