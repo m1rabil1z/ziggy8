@@ -57,7 +57,7 @@ pub fn Chip8__init(init: std.process.Init) Chip8 {
     var memory: [MEMORY_SIZE]u8 = [_]u8{0} ** (MEMORY_SIZE);
 
     for (0..FONTSET_SIZE) |i| {
-        memory[FONTSET_SIZE + i] = fontset[i];
+        memory[FONTSET_START_ADDRESS + i] = fontset[i];
     }
 
     const current_time = std.Io.Clock.now(.real, init.io);
@@ -170,7 +170,7 @@ pub fn Cycle(self: *Chip8) void {
     }
 
     if (self.soundTimer > 0) {
-        self.soundTimerTimer -= 1;
+        self.soundTimer -= 1;
     }
 }
 
@@ -195,137 +195,324 @@ fn OP_NULL(self: *Chip8) void {
 }
 
 fn OP_00E0(self: *Chip8) void {
-    _ = self;
+    @memset(self.video, 0);
 }
 
 fn OP_00EE(self: *Chip8) void {
-    _ = self;
+    self.sp -= 1;
+    self.pc = self.stack[self.sp];
 }
 
 fn OP_1nnn(self: *Chip8) void {
-    _ = self;
+    const address: u16 = self.opcode & 0x0FFF;
+    self.pc = address;
 }
 
 fn OP_2nnn(self: *Chip8) void {
-    _ = self;
+    const address: u16 = self.opcode & 0x0FFF;
+
+    self.stack[self.sp] = self.pc;
+    self.sp += 1;
+    self.pc = address;
 }
 
 fn OP_3xkk(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    const byte: u8 = @intCast((self.opcode & 0x00FF));
+    if (self.registers[Vx] == byte) {
+        self.pc += 2;
+    }
 }
 
 fn OP_4xkk(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    const byte: u8 = @intCast((self.opcode & 0x00FF));
+    if (self.registers[Vx] != byte) {
+        self.pc += 2;
+    }
 }
 
 fn OP_5xy0(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    const Vy: u8 = @intCast((self.opcode & 0x00F0) >> 4);
+
+    if (self.registers[Vx] == self.registers[Vy]) {
+        self.pc += 2;
+    }
 }
 
 fn OP_6xkk(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    const byte: u8 = @intCast((self.opcode & 0x00FF));
+
+    self.registers[Vx] = byte;
 }
 
 fn OP_7xkk(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    const byte: u8 = @intCast((self.opcode & 0x00FF));
+
+    self.registers[Vx] += byte;
 }
 
 fn OP_8xy0(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    const Vy: u8 = @intCast((self.opcode & 0x00F0) >> 4);
+
+    self.registers[Vx] = self.registers[Vy];
 }
 
 fn OP_8xy1(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    const Vy: u8 = @intCast((self.opcode & 0x00F0) >> 4);
+
+    self.registers[Vx] |= self.registers[Vy];
 }
 
 fn OP_8xy2(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    const Vy: u8 = @intCast((self.opcode & 0x00F0) >> 4);
+
+    self.registers[Vx] &= self.registers[Vy];
 }
 
 fn OP_8xy3(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    const Vy: u8 = @intCast((self.opcode & 0x00F0) >> 4);
+
+    self.registers[Vx] ^= self.registers[Vy];
 }
 
 fn OP_8xy4(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    const Vy: u8 = @intCast((self.opcode & 0x00F0) >> 4);
+
+    const sum: u16 = @intCast(self.registers[Vx] + self.registers[Vy]);
+
+    if (sum > 255) {
+        self.registers[0xF] = 1;
+    } else {
+        self.registers[0xF] = 0;
+    }
+
+    self.registers[Vx] = @intCast(sum & 0xFF);
 }
 
 fn OP_8xy5(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    const Vy: u8 = @intCast((self.opcode & 0x00F0) >> 4);
+
+    if (self.registers[Vx] > self.registers[Vy]) {
+        self.registers[0xF] = 1;
+    } else {
+        self.registers[0xF] = 0;
+    }
+
+    self.registers[Vx] -= self.registers[Vy];
 }
 
 fn OP_8xy6(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+
+    self.registers[0xF] = (self.registers[Vx] & 0x1);
+    self.registers[Vx] >>= 1;
 }
 
 fn OP_8xy7(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    const Vy: u8 = @intCast((self.opcode & 0x00F0) >> 4);
+
+    if (self.registers[Vy] > self.registers[Vx]) {
+        self.registers[0xF] = 1;
+    } else {
+        self.registers[0xF] = 0;
+    }
+
+    self.registers[Vx] = self.registers[Vy] - self.registers[Vx];
 }
 
 fn OP_8xyE(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+
+    self.registers[0xF] = (self.registers[Vx] & 0x80) >> 7;
+    self.registers[Vx] <<= 1;
 }
 
 fn OP_9xy0(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    const Vy: u8 = @intCast((self.opcode & 0x00F0) >> 4);
+
+    if (self.registers[Vx] != self.registers[Vy]) {
+        self.pc += 2;
+    }
 }
 
 fn OP_Annn(self: *Chip8) void {
-    _ = self;
+    const address: u16 = self.opcode & 0x0FFF;
+    self.index = address;
 }
 
 fn OP_Bnnn(self: *Chip8) void {
-    _ = self;
+    const address: u16 = self.opcode & 0x0FFF;
+    self.pc = @as(u16, self.registers[0]) + address;
 }
 
 fn OP_Cxkk(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    const byte: u8 = @intCast((self.opcode & 0x00FF));
+
+    const randByte: u8 = self.prng.random().int(u8);
+
+    self.registers[Vx] = randByte & byte;
 }
 
 fn OP_Dxyn(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    const Vy: u8 = @intCast((self.opcode & 0x00F0) >> 4);
+    const height: u8 = @intCast((self.opcode & 0x000F));
+
+    const xPos: usize = self.registers[Vx] % @as(u8, VIDEO_WIDTH);
+    const yPos: usize = self.registers[Vy] % @as(u8, VIDEO_HEIGHT);
+
+    self.registers[0xF] = 0;
+
+    for (0..height) |row| {
+        if ((yPos + row) >= VIDEO_HEIGHT) break;
+        const spriteByte: u8 = self.memory[self.index + row];
+
+        for (0..8) |col| {
+            if ((xPos + col) >= VIDEO_WIDTH) break;
+
+            const spritePixel: u8 = spriteByte & (@as(u8, 0x80) >> @intCast(col));
+            const screenPixel: *u32 = &self.video[(yPos + row) * VIDEO_WIDTH + (xPos + col)];
+
+            if (spritePixel != 0) {
+                if (screenPixel.* == 0xFFFFFFFF) {
+                    self.registers[0xF] = 1;
+                }
+                screenPixel.* ^= 0xFFFFFFFF;
+            }
+        }
+    }
 }
 
 fn OP_Ex9E(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    const key: u8 = self.registers[Vx];
+
+    if (self.keypad[key] != 0) {
+        self.pc += 2;
+    }
 }
 
 fn OP_ExA1(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    const key: u8 = self.registers[Vx];
+
+    if (self.keypad[key] == 0) {
+        self.pc += 2;
+    }
 }
 
 fn OP_Fx07(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+
+    self.registers[Vx] = self.delayTimer;
 }
 
 fn OP_Fx0A(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+
+    if (self.keypad[0] != 0) {
+        self.registers[Vx] = 0;
+    } else if (self.keypad[1] != 0) {
+        self.registers[Vx] = 1;
+    } else if (self.keypad[2] != 0) {
+        self.registers[Vx] = 2;
+    } else if (self.keypad[3] != 0) {
+        self.registers[Vx] = 3;
+    } else if (self.keypad[4] != 0) {
+        self.registers[Vx] = 4;
+    } else if (self.keypad[5] != 0) {
+        self.registers[Vx] = 5;
+    } else if (self.keypad[6] != 0) {
+        self.registers[Vx] = 6;
+    } else if (self.keypad[7] != 0) {
+        self.registers[Vx] = 7;
+    } else if (self.keypad[8] != 0) {
+        self.registers[Vx] = 8;
+    } else if (self.keypad[9] != 0) {
+        self.registers[Vx] = 9;
+    } else if (self.keypad[10] != 0) {
+        self.registers[Vx] = 10;
+    } else if (self.keypad[11] != 0) {
+        self.registers[Vx] = 11;
+    } else if (self.keypad[12] != 0) {
+        self.registers[Vx] = 12;
+    } else if (self.keypad[13] != 0) {
+        self.registers[Vx] = 13;
+    } else if (self.keypad[14] != 0) {
+        self.registers[Vx] = 14;
+    } else if (self.keypad[15] != 0) {
+        self.registers[Vx] = 15;
+    } else {
+        self.pc -= 2;
+    }
 }
 
 fn OP_Fx15(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+
+    self.delayTimer = self.registers[Vx];
 }
 
 fn OP_Fx18(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+
+    self.soundTimer = self.registers[Vx];
 }
 
 fn OP_Fx1E(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+
+    self.index += self.registers[Vx];
 }
 
 fn OP_Fx29(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    const digit = self.registers[Vx];
+
+    self.index = @as(u16, FONTSET_START_ADDRESS) + @as(u16, (5 * digit));
 }
 
 fn OP_Fx33(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+    var value = self.registers[Vx];
+
+    // Ones-place
+    self.memory[self.index + 2] = value % 10;
+    value /= 10;
+
+    // Tens-place
+    self.memory[self.index + 1] = value % 10;
+    value /= 10;
+
+    // Hundreds-place
+    self.memory[self.index] = value % 10;
 }
 
 fn OP_Fx55(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+
+    for (0..(Vx + 1)) |i| {
+        self.memory[@as(usize, self.index) + i] = self.registers[i];
+    }
 }
 
 fn OP_Fx65(self: *Chip8) void {
-    _ = self;
+    const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
+
+    for (0..(Vx + 1)) |i| {
+        self.registers[i] = self.memory[@as(usize, self.index) + i];
+    }
 }
