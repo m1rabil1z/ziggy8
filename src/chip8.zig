@@ -190,7 +190,7 @@ fn TableE(self: *Chip8) void {
 }
 
 fn TableF(self: *Chip8) void {
-    _ = self.tableF[self.opcode & 0x000F](self);
+    _ = self.tableF[self.opcode & 0x00FF](self);
 }
 
 fn OP_NULL(self: *Chip8) void {
@@ -292,53 +292,55 @@ fn OP_8xy4(self: *Chip8) void {
 
     const sum: u16 = @as(u16, @intCast(self.registers[Vx])) + @as(u16, @intCast(self.registers[Vy]));
 
+    self.registers[Vx] = @intCast(sum & 0xFF);
+
     if (sum > 255) {
         self.registers[0xF] = 1;
     } else {
         self.registers[0xF] = 0;
     }
-
-    self.registers[Vx] = @intCast(sum & 0xFF);
 }
 
 fn OP_8xy5(self: *Chip8) void {
     const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
     const Vy: u8 = @intCast((self.opcode & 0x00F0) >> 4);
 
-    if (self.registers[Vx] > self.registers[Vy]) {
-        self.registers[0xF] = 1;
-    } else {
-        self.registers[0xF] = 0;
-    }
+    const vx = self.registers[Vx];
+    const vy = self.registers[Vy];
+
+    const flag: u8 = if (vx >= vy) 1 else 0;
 
     self.registers[Vx] -%= self.registers[Vy];
+    self.registers[0xF] = flag;
 }
 
 fn OP_8xy6(self: *Chip8) void {
     const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
 
-    self.registers[0xF] = (self.registers[Vx] & 0x1);
+    const flag = (self.registers[Vx] & 1);
     self.registers[Vx] >>= 1;
+    self.registers[0xF] = (flag & 1);
 }
 
 fn OP_8xy7(self: *Chip8) void {
     const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
     const Vy: u8 = @intCast((self.opcode & 0x00F0) >> 4);
 
-    if (self.registers[Vy] > self.registers[Vx]) {
-        self.registers[0xF] = 1;
-    } else {
-        self.registers[0xF] = 0;
-    }
+    const vx = self.registers[Vx];
+    const vy = self.registers[Vy];
+
+    const flag: u8 = if (vy >= vx) 1 else 0;
 
     self.registers[Vx] = self.registers[Vy] -% self.registers[Vx];
+    self.registers[0xF] = flag;
 }
 
 fn OP_8xyE(self: *Chip8) void {
     const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
 
-    self.registers[0xF] = (self.registers[Vx] & 0x80) >> 7;
+    const flag = self.registers[Vx] & 0x80;
     self.registers[Vx] <<= 1;
+    self.registers[0xF] = (flag) >> 7;
 }
 
 fn OP_9xy0(self: *Chip8) void {
