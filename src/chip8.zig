@@ -64,7 +64,7 @@ pub fn Chip8__init(init: std.process.Init) Chip8 {
     const zero_time = std.Io.Timestamp.zero;
     const duration = zero_time.durationTo(current_time);
     const duration_ms = duration.toMilliseconds();
-    const seed: u64 = @as(u64, duration_ms);
+    const seed: u64 = @as(u64, @intCast(duration_ms));
 
     var table: [0xF + 1]*const fn (*Chip8) void = undefined;
     table[0x0] = &Table0;
@@ -153,13 +153,16 @@ pub fn LoadROM(self: *Chip8, init: std.process.Init, filename: [:0]const u8) !vo
     defer file.close(init.io);
     var i_buffer: [1024]u8 = undefined;
     i_buffer[0] = 0;
-    var reader = file.reader(init.io, i_buffer).interface;
+    var reader = file.reader(init.io, &i_buffer);
 
-    _ = try reader.readSliceAll(self.memory[START_ADDRESS..]);
+    const file_stat = try file.stat(init.io);
+    const file_size = file_stat.size;
+
+    _ = try reader.interface.readSliceAll(self.memory[START_ADDRESS .. START_ADDRESS + file_size]);
 }
 
 pub fn Cycle(self: *Chip8) void {
-    self.opcode = @intCast((self.memory[self.pc] << 8) | (self.memory[self.pc + 1]));
+    self.opcode = (@as(u16, self.memory[self.pc]) << 8) | (@as(u16, self.memory[self.pc + 1]));
 
     self.pc += 2;
 
@@ -195,7 +198,7 @@ fn OP_NULL(self: *Chip8) void {
 }
 
 fn OP_00E0(self: *Chip8) void {
-    @memset(self.video, 0);
+    @memset(&self.video, 0);
 }
 
 fn OP_00EE(self: *Chip8) void {

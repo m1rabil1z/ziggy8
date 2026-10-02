@@ -102,7 +102,7 @@ pub fn ProcessInput(self: *Platform, keys: [*]u8) bool {
     var event: sdl.SDL_Event = undefined;
 
     while (sdl.SDL_PollEvent(&event)) {
-        switch (@as(c_int, event.type)) {
+        switch (@as(c_int, @intCast(event.type))) {
             sdl.SDL_EVENT_QUIT => {
                 quit = true;
             },
