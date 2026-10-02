@@ -255,7 +255,7 @@ fn OP_7xkk(self: *Chip8) void {
     const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
     const byte: u8 = @intCast((self.opcode & 0x00FF));
 
-    self.registers[Vx] += byte;
+    self.registers[Vx] +%= byte;
 }
 
 fn OP_8xy0(self: *Chip8) void {
@@ -290,7 +290,7 @@ fn OP_8xy4(self: *Chip8) void {
     const Vx: u8 = @intCast((self.opcode & 0x0F00) >> 8);
     const Vy: u8 = @intCast((self.opcode & 0x00F0) >> 4);
 
-    const sum: u16 = @intCast(self.registers[Vx] + self.registers[Vy]);
+    const sum: u16 = @as(u16, @intCast(self.registers[Vx])) + @as(u16, @intCast(self.registers[Vy]));
 
     if (sum > 255) {
         self.registers[0xF] = 1;
@@ -311,7 +311,7 @@ fn OP_8xy5(self: *Chip8) void {
         self.registers[0xF] = 0;
     }
 
-    self.registers[Vx] -= self.registers[Vy];
+    self.registers[Vx] -%= self.registers[Vy];
 }
 
 fn OP_8xy6(self: *Chip8) void {
@@ -331,7 +331,7 @@ fn OP_8xy7(self: *Chip8) void {
         self.registers[0xF] = 0;
     }
 
-    self.registers[Vx] = self.registers[Vy] - self.registers[Vx];
+    self.registers[Vx] = self.registers[Vy] -% self.registers[Vx];
 }
 
 fn OP_8xyE(self: *Chip8) void {
