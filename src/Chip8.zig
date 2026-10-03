@@ -148,16 +148,7 @@ pub fn init(io: std.Io) Chip8 {
 }
 
 pub fn loadROM(self: *Chip8, io: std.Io, filename: [:0]const u8) !void {
-    const file = try std.Io.Dir.cwd().openFile(io, filename, .{ .mode = .read_only });
-    defer file.close(io);
-    var i_buffer: [1024]u8 = undefined;
-    i_buffer[0] = 0;
-    var reader = file.reader(io, &i_buffer);
-
-    const file_stat = try file.stat(io);
-    const file_size = file_stat.size;
-
-    try reader.interface.readSliceAll(self.memory[START_ADDRESS .. START_ADDRESS + file_size]);
+    _ = try std.Io.Dir.cwd().readFile(io, filename, self.memory[START_ADDRESS..]);
 }
 
 pub fn cycle(self: *Chip8) void {
