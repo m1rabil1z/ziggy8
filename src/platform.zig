@@ -9,21 +9,21 @@ window: sdl.video.Window,
 renderer: sdl.render.Renderer,
 texture: sdl.render.Texture,
 
-pub fn init(title: [:0]const u8, windowWidth: i32, windowHeight: i32, textureWidth: i32, textureHeight: i32) !Platform {
+pub fn init(title: [:0]const u8, windowWidth: u32, windowHeight: u32, textureWidth: u32, textureHeight: u32) !Platform {
     try sdl.init(init_flags);
 
     const window, const renderer = try sdl.render.Renderer.initWithWindow(
         title,
-        @abs(windowWidth),
-        @abs(windowHeight),
+        windowWidth,
+        windowHeight,
         .{ .resizable = true },
     );
 
     const texture = try renderer.createTexture(
         .packed_rgba_8_8_8_8,
         .streaming,
-        @abs(textureWidth),
-        @abs(textureHeight),
+        textureWidth,
+        textureHeight,
     );
 
     try texture.setScaleMode(.pixel_art);

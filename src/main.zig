@@ -13,17 +13,17 @@ pub fn main(init: std.process.Init) !void {
         std.process.exit(1);
     }
 
-    const videoScale = try std.fmt.parseInt(i32, args[1], 10);
-    const cycleDelay: i32 = try std.fmt.parseInt(i32, args[2], 10);
+    const videoScale = try std.fmt.parseInt(u32, args[1], 10);
+    const cycleDelay = try std.fmt.parseInt(u32, args[2], 10);
 
     const romFilename = args[3];
 
     var platform: Platform = try .init(
         "CHIP-8 Emulator",
-        videoScale * @as(i32, @intCast(C8.VIDEO_WIDTH)),
-        videoScale * @as(i32, @intCast(C8.VIDEO_HEIGHT)),
-        @as(i32, @intCast(C8.VIDEO_WIDTH)),
-        @as(i32, @intCast(C8.VIDEO_HEIGHT)),
+        videoScale * C8.VIDEO_WIDTH,
+        videoScale * C8.VIDEO_HEIGHT,
+        C8.VIDEO_WIDTH,
+        C8.VIDEO_HEIGHT,
     );
     defer platform.deinit();
 
