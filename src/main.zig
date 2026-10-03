@@ -1,6 +1,6 @@
 const std = @import("std");
-const pm = @import("platform.zig");
-const c8 = @import("chip8.zig");
+const Platform = @import("platform.zig");
+const C8 = @import("Chip8.zig");
 
 pub fn main(init: std.process.Init) !void {
     const arena = init.arena.allocator();
@@ -18,35 +18,34 @@ pub fn main(init: std.process.Init) !void {
 
     const romFilename = args[3];
 
-    var platform = try pm.Platform__init(
+    var platform: Platform = try .init(
         "CHIP-8 Emulator",
-        videoScale * @as(i32, @intCast(c8.VIDEO_WIDTH)),
-        videoScale * @as(i32, @intCast(c8.VIDEO_HEIGHT)),
-        @as(i32, @intCast(c8.VIDEO_WIDTH)),
-        @as(i32, @intCast(c8.VIDEO_HEIGHT)),
+        videoScale * @as(i32, @intCast(C8.VIDEO_WIDTH)),
+        videoScale * @as(i32, @intCast(C8.VIDEO_HEIGHT)),
+        @as(i32, @intCast(C8.VIDEO_WIDTH)),
+        @as(i32, @intCast(C8.VIDEO_HEIGHT)),
     );
+    defer platform.deinit();
 
-    var chip8 = c8.Chip8__init(init);
-    _ = try c8.LoadROM(&chip8, init, romFilename);
-
-    const videoPitch = @as(i32, @intCast(@sizeOf(u32) * c8.VIDEO_WIDTH));
+    var chip8: C8 = .init(init.io);
+    chip8.loadROM(init.io, romFilename) catch {
+        std.log.err("Invalid rom argument",.{});
+        return;
+    };
 
     var lastCycleTime = std.Io.Clock.now(.real, init.io);
-    var quit: bool = false;
 
-    while (!quit) {
-        quit = pm.ProcessInput(&platform, &chip8.keypad);
-
+    while (Platform.processInput(&chip8.keypad)) {
         const currentTime = std.Io.Clock.now(.real, init.io);
-
         const dt: i32 = @intCast(lastCycleTime.durationTo(currentTime).toMilliseconds());
 
         if (dt > cycleDelay) {
             lastCycleTime = currentTime;
 
-            c8.Cycle(&chip8);
+            chip8.cycle();
 
-            pm.Update(&platform, &chip8.video, videoPitch);
+            const videoPitch = @sizeOf(u32) * C8.VIDEO_WIDTH;
+            try platform.update(&chip8.video, videoPitch);
         }
     }
 }

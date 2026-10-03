@@ -1,257 +1,99 @@
+const Platform = @This();
 const std = @import("std");
-const sdl = @cImport(@cInclude("SDL3/SDL.h"));
-const glad = @cImport(@cInclude("glad/glad.h"));
+const sdl = @import("sdl3");
+const chip8 = @import("Chip8.zig");
 
-const Platform = struct {
-    window: ?*sdl.SDL_Window,
-    gl_context: sdl.SDL_GLContext,
-    framebuffer_texture: glad.GLuint,
-    renderer: ?*sdl.SDL_Renderer,
-    texture: ?*sdl.SDL_Texture,
-};
+const init_flags: sdl.InitFlags = .{ .video = true };
 
-pub fn Platform__init(title: [*:0]const u8, windowWidth: i32, windowHeight: i32, textureWidth: i32, textureHeight: i32) !Platform {
-    if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) {
-        return error.InitFailed;
-    }
+window: sdl.video.Window,
+renderer: sdl.render.Renderer,
+texture: sdl.render.Texture,
 
-    if (!sdl.SDL_GL_SetAttribute(@intCast(sdl.SDL_GL_CONTEXT_PROFILE_MASK), sdl.SDL_GL_CONTEXT_PROFILE_CORE)) {
-        return error.setAttprofmaskFailed;
-    }
-    if (!sdl.SDL_GL_SetAttribute(@intCast(sdl.SDL_GL_CONTEXT_MAJOR_VERSION), 3)) {
-        return error.setAttmajFailed;
-    }
-    if (!sdl.SDL_GL_SetAttribute(@intCast(sdl.SDL_GL_CONTEXT_MINOR_VERSION), 3)) {
-        return error.setAttminfailed;
-    }
+pub fn init(title: [:0]const u8, windowWidth: i32, windowHeight: i32, textureWidth: i32, textureHeight: i32) !Platform {
+    try sdl.init(init_flags);
 
-    const window = sdl.SDL_CreateWindow(
+    const window, const renderer = try sdl.render.Renderer.initWithWindow(
         title,
-        windowWidth,
-        windowHeight,
-        sdl.SDL_WINDOW_OPENGL | sdl.SDL_WINDOW_RESIZABLE,
+        @abs(windowWidth),
+        @abs(windowHeight),
+        .{ .resizable = true },
     );
 
-    if (window == null) {
-        return error.createWindowFailed;
-    }
-
-    const gl_context = sdl.SDL_GL_CreateContext(window);
-
-    if (gl_context == null) {
-        return error.createContextFailed;
-    }
-
-    if (!sdl.SDL_GL_SetSwapInterval(1)) {
-        return error.setSwapIntervalfailed;
-    }
-    _ = glad.gladLoadGL();
-
-    var framebuffer_texture: glad.GLuint = undefined;
-    glad.glGenTextures(1, &framebuffer_texture);
-    glad.glBindTexture(@intCast(glad.GL_TEXTURE), framebuffer_texture);
-    glad.glTexParameteri(@intCast(glad.GL_TEXTURE_2D), @intCast(glad.GL_TEXTURE_MIN_FILTER), glad.GL_NEAREST);
-    glad.glTexParameteri(@intCast(glad.GL_TEXTURE_2D), @intCast(glad.GL_TEXTURE_MAG_FILTER), glad.GL_NEAREST);
-    glad.glTexParameteri(@intCast(glad.GL_TEXTURE_2D), @intCast(glad.GL_TEXTURE_WRAP_S), @intCast(glad.GL_CLAMP_TO_EDGE));
-    glad.glTexParameteri(@intCast(glad.GL_TEXTURE_2D), @intCast(glad.GL_TEXTURE_WRAP_T), @intCast(glad.GL_CLAMP_TO_EDGE));
-    glad.glTexImage2D(@intCast(glad.GL_TEXTURE_2D), 0, glad.GL_RGBA, 640, 320, 0, @intCast(glad.GL_RGBA), @intCast(glad.GL_UNSIGNED_BYTE), null);
-    glad.glBindTexture(@intCast(glad.GL_TEXTURE), 0);
-
-    const renderer = sdl.SDL_CreateRenderer(window, null);
-    if (renderer == null) {
-        return error.createRendererFailed;
-    }
-
-    const texture = sdl.SDL_CreateTexture(
-        renderer,
-        sdl.SDL_PIXELFORMAT_RGBA8888,
-        sdl.SDL_TEXTUREACCESS_STREAMING,
-        @intCast(textureWidth),
-        @intCast(textureHeight),
+    const texture = try renderer.createTexture(
+        .packed_rgba_8_8_8_8,
+        .streaming,
+        @abs(textureWidth),
+        @abs(textureHeight),
     );
-    if (texture == null) {
-        return error.createTexturerFailed;
-    }
 
-    return Platform{
+    try texture.setScaleMode(.pixel_art);
+
+    return .{
         .window = window,
-        .gl_context = gl_context,
-        .framebuffer_texture = framebuffer_texture,
         .renderer = renderer,
         .texture = texture,
     };
 }
 
-pub fn Platform__destroy(self: *Platform) void {
-    sdl.SDL_DestroyTexture(self.texture);
-    sdl.SDL_DestroyRenderer(self.renderer);
-    sdl.SDL_DestroyWindow(self.window);
-    sdl.SDL_Quit();
+pub fn deinit(self: *Platform) void {
+    self.texture.deinit();
+    self.renderer.deinit();
+    self.window.deinit();
+    sdl.quit(init_flags);
 }
 
-pub fn Update(self: *Platform, buffer: *const anyopaque, pitch: i32) void {
-    _ = sdl.SDL_UpdateTexture(self.texture, null, buffer, @intCast(pitch));
-    _ = sdl.SDL_RenderClear(self.renderer);
-    _ = sdl.SDL_RenderTexture(self.renderer, self.texture, null, null);
-    _ = sdl.SDL_RenderPresent(self.renderer);
+pub fn update(self: *Platform, buffer: *[chip8.VIDEO_HEIGHT * chip8.VIDEO_WIDTH]u32, pitch: usize) !void {
+    try self.texture.update(null, @ptrCast(buffer), pitch);
+    try self.renderer.clear();
+    try self.renderer.renderTexture(self.texture, null, null);
+    try self.renderer.present();
 }
 
-pub fn ProcessInput(self: *Platform, keys: [*]u8) bool {
-    _ = self;
-    var quit: bool = false;
-    var event: sdl.SDL_Event = undefined;
-
-    while (sdl.SDL_PollEvent(&event)) {
-        switch (@as(c_int, @intCast(event.type))) {
-            sdl.SDL_EVENT_QUIT => {
-                quit = true;
+pub fn processInput(keys: [*]u8) bool {
+    while (sdl.events.poll()) |event| {
+        switch (event) {
+            .quit => return false,
+            .key_down => |key| switch (key.key.?) {
+                .escape => return false,
+                .x => keys[0] = 1,
+                .one => keys[1] = 1,
+                .two => keys[2] = 1,
+                .three => keys[3] = 1,
+                .q => keys[4] = 1,
+                .w => keys[5] = 1,
+                .e => keys[6] = 1,
+                .a => keys[7] = 1,
+                .s => keys[8] = 1,
+                .d => keys[9] = 1,
+                .z => keys[0xA] = 1,
+                .c => keys[0xB] = 1,
+                .four => keys[0xC] = 1,
+                .r => keys[0xD] = 1,
+                .f => keys[0xE] = 1,
+                .v => keys[0xF] = 1,
+                else => {},
             },
-
-            sdl.SDL_EVENT_KEY_DOWN => {
-                switch (@as(c_uint, event.key.key)) {
-                    sdl.SDLK_ESCAPE => {
-                        quit = true;
-                    },
-
-                    sdl.SDLK_X => {
-                        keys[0] = 1;
-                    },
-
-                    sdl.SDLK_1 => {
-                        keys[1] = 1;
-                    },
-
-                    sdl.SDLK_2 => {
-                        keys[2] = 1;
-                    },
-
-                    sdl.SDLK_3 => {
-                        keys[3] = 1;
-                    },
-
-                    sdl.SDLK_Q => {
-                        keys[4] = 1;
-                    },
-
-                    sdl.SDLK_W => {
-                        keys[5] = 1;
-                    },
-
-                    sdl.SDLK_E => {
-                        keys[6] = 1;
-                    },
-
-                    sdl.SDLK_A => {
-                        keys[7] = 1;
-                    },
-
-                    sdl.SDLK_S => {
-                        keys[8] = 1;
-                    },
-
-                    sdl.SDLK_D => {
-                        keys[9] = 1;
-                    },
-
-                    sdl.SDLK_Z => {
-                        keys[0xA] = 1;
-                    },
-
-                    sdl.SDLK_C => {
-                        keys[0xB] = 1;
-                    },
-
-                    sdl.SDLK_4 => {
-                        keys[0xC] = 1;
-                    },
-
-                    sdl.SDLK_R => {
-                        keys[0xD] = 1;
-                    },
-
-                    sdl.SDLK_F => {
-                        keys[0xE] = 1;
-                    },
-
-                    sdl.SDLK_V => {
-                        keys[0xF] = 1;
-                    },
-
-                    else => {},
-                }
-            },
-
-            sdl.SDL_EVENT_KEY_UP => {
-                switch (@as(c_uint, event.key.key)) {
-                    sdl.SDLK_X => {
-                        keys[0] = 0;
-                    },
-
-                    sdl.SDLK_1 => {
-                        keys[1] = 0;
-                    },
-
-                    sdl.SDLK_2 => {
-                        keys[2] = 0;
-                    },
-
-                    sdl.SDLK_3 => {
-                        keys[3] = 0;
-                    },
-
-                    sdl.SDLK_Q => {
-                        keys[4] = 0;
-                    },
-
-                    sdl.SDLK_W => {
-                        keys[5] = 0;
-                    },
-
-                    sdl.SDLK_E => {
-                        keys[6] = 0;
-                    },
-
-                    sdl.SDLK_A => {
-                        keys[7] = 0;
-                    },
-
-                    sdl.SDLK_S => {
-                        keys[8] = 0;
-                    },
-
-                    sdl.SDLK_D => {
-                        keys[9] = 0;
-                    },
-
-                    sdl.SDLK_Z => {
-                        keys[0xA] = 0;
-                    },
-
-                    sdl.SDLK_C => {
-                        keys[0xB] = 0;
-                    },
-
-                    sdl.SDLK_4 => {
-                        keys[0xC] = 0;
-                    },
-
-                    sdl.SDLK_R => {
-                        keys[0xD] = 0;
-                    },
-
-                    sdl.SDLK_F => {
-                        keys[0xE] = 0;
-                    },
-
-                    sdl.SDLK_V => {
-                        keys[0xF] = 0;
-                    },
-
-                    else => {},
-                }
+            .key_up => |key| switch (key.key.?) {
+                .x => keys[0] = 0,
+                .one => keys[1] = 0,
+                .two => keys[2] = 0,
+                .three => keys[3] = 0,
+                .q => keys[4] = 0,
+                .w => keys[5] = 0,
+                .e => keys[6] = 0,
+                .a => keys[7] = 0,
+                .s => keys[8] = 0,
+                .d => keys[9] = 0,
+                .z => keys[0xA] = 0,
+                .c => keys[0xB] = 0,
+                .four => keys[0xC] = 0,
+                .r => keys[0xD] = 0,
+                .f => keys[0xE] = 0,
+                .v => keys[0xF] = 0,
+                else => {},
             },
             else => {},
         }
     }
-    return quit;
+    return true;
 }
