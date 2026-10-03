@@ -7,8 +7,8 @@ const KEY_COUNT: u32 = 16;
 const MEMORY_SIZE: u32 = 4096;
 const REGISTER_COUNT: u32 = 16;
 const STACK_LEVELS: u32 = 16;
-pub const VIDEO_HEIGHT: u32 = 32;
-pub const VIDEO_WIDTH: u32 = 64;
+pub const VIDEO_HEIGHT = 32;
+pub const VIDEO_WIDTH = 64;
 
 const fontset: [FONTSET_SIZE]u8 =
     .{
