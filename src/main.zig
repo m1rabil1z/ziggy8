@@ -1,6 +1,6 @@
 const std = @import("std");
 const Platform = @import("platform.zig");
-const c8 = @import("chip8.zig");
+const C8 = @import("Chip8.zig");
 
 pub fn main(init: std.process.Init) !void {
     const arena = init.arena.allocator();
@@ -20,15 +20,15 @@ pub fn main(init: std.process.Init) !void {
 
     var platform: Platform = try .init(
         "CHIP-8 Emulator",
-        videoScale * @as(i32, @intCast(c8.VIDEO_WIDTH)),
-        videoScale * @as(i32, @intCast(c8.VIDEO_HEIGHT)),
-        @as(i32, @intCast(c8.VIDEO_WIDTH)),
-        @as(i32, @intCast(c8.VIDEO_HEIGHT)),
+        videoScale * @as(i32, @intCast(C8.VIDEO_WIDTH)),
+        videoScale * @as(i32, @intCast(C8.VIDEO_HEIGHT)),
+        @as(i32, @intCast(C8.VIDEO_WIDTH)),
+        @as(i32, @intCast(C8.VIDEO_HEIGHT)),
     );
     defer platform.deinit();
 
-    var chip8 = c8.Chip8__init(init);
-    c8.LoadROM(&chip8, init, romFilename) catch {
+    var chip8: C8 = .init(init.io);
+    chip8.loadROM(init.io, romFilename) catch {
         std.log.err("Invalid rom argument",.{});
         return;
     };
@@ -42,9 +42,9 @@ pub fn main(init: std.process.Init) !void {
         if (dt > cycleDelay) {
             lastCycleTime = currentTime;
 
-            c8.Cycle(&chip8);
+            chip8.cycle();
 
-            const videoPitch = @sizeOf(u32) * c8.VIDEO_WIDTH;
+            const videoPitch = @sizeOf(u32) * C8.VIDEO_WIDTH;
             try platform.update(&chip8.video, videoPitch);
         }
     }

@@ -1,8 +1,10 @@
+const Chip8 = @This();
+
 const std = @import("std");
 
 const FONTSET_SIZE: u32 = 80;
 const FONTSET_START_ADDRESS: u32 = 0x50;
-const START_ADDRESS: u32 = 0x200;
+const START_ADDRESS = 0x200;
 const KEY_COUNT: u32 = 16;
 const MEMORY_SIZE: u32 = 4096;
 const REGISTER_COUNT: u32 = 16;
@@ -10,61 +12,58 @@ const STACK_LEVELS: u32 = 16;
 pub const VIDEO_HEIGHT = 32;
 pub const VIDEO_WIDTH = 64;
 
-const fontset: [FONTSET_SIZE]u8 =
-    .{
-        0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
-        0x20, 0x60, 0x20, 0x20, 0x70, // 1
-        0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
-        0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
-        0x90, 0x90, 0xF0, 0x10, 0x10, // 4
-        0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
-        0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
-        0xF0, 0x10, 0x20, 0x40, 0x40, // 7
-        0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
-        0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
-        0xF0, 0x90, 0xF0, 0x90, 0x90, // A
-        0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
-        0xF0, 0x80, 0x80, 0x80, 0xF0, // C
-        0xE0, 0x90, 0x90, 0x90, 0xE0, // D
-        0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
-        0xF0, 0x80, 0xF0, 0x80, 0x80, // F
-    };
-
-const Chip8 = struct {
-    keypad: [KEY_COUNT]u8,
-    video: [VIDEO_HEIGHT * VIDEO_WIDTH]u32,
-
-    memory: [MEMORY_SIZE]u8,
-    registers: [REGISTER_COUNT]u8,
-    index: u16,
-    pc: u16,
-    delayTimer: u8,
-    soundTimer: u8,
-    stack: [STACK_LEVELS]u16,
-    sp: u8,
-    opcode: u16,
-
-    prng: std.Random.DefaultPrng,
-
-    table: [0xF + 1]*const fn (*Chip8) void,
-    table0: [0xE + 1]*const fn (*Chip8) void,
-    table8: [0xE + 1]*const fn (*Chip8) void,
-    tableE: [0xE + 1]*const fn (*Chip8) void,
-    tableF: [0x65 + 1]*const fn (*Chip8) void,
+const fontset: [FONTSET_SIZE]u8 = .{
+    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+    0x20, 0x60, 0x20, 0x20, 0x70, // 1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+    0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+    0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+    0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 };
 
-pub fn Chip8__init(init: std.process.Init) Chip8 {
+keypad: [KEY_COUNT]u8,
+video: [VIDEO_HEIGHT * VIDEO_WIDTH]u32,
+
+memory: [MEMORY_SIZE]u8,
+registers: [REGISTER_COUNT]u8,
+index: u16,
+pc: u16,
+delayTimer: u8,
+soundTimer: u8,
+stack: [STACK_LEVELS]u16,
+sp: u8,
+opcode: u16,
+
+prng: std.Random.DefaultPrng,
+
+table: [0xF + 1]*const fn (*Chip8) void,
+table0: [0xE + 1]*const fn (*Chip8) void,
+table8: [0xE + 1]*const fn (*Chip8) void,
+tableE: [0xE + 1]*const fn (*Chip8) void,
+tableF: [0x65 + 1]*const fn (*Chip8) void,
+
+pub fn init(io: std.Io) Chip8 {
     var memory: [MEMORY_SIZE]u8 = [_]u8{0} ** (MEMORY_SIZE);
 
     for (0..FONTSET_SIZE) |i| {
         memory[FONTSET_START_ADDRESS + i] = fontset[i];
     }
 
-    const current_time = std.Io.Clock.now(.real, init.io);
-    const zero_time = std.Io.Timestamp.zero;
+    const current_time = std.Io.Clock.now(.real, io);
+    const zero_time: std.Io.Timestamp = .zero;
     const duration = zero_time.durationTo(current_time);
     const duration_ms = duration.toMilliseconds();
-    const seed: u64 = @as(u64, @intCast(duration_ms));
+    const seed: u64 = @abs(duration_ms);
 
     var table: [0xF + 1]*const fn (*Chip8) void = undefined;
     table[0x0] = &Table0;
@@ -125,21 +124,21 @@ pub fn Chip8__init(init: std.process.Init) Chip8 {
     tableF[0x55] = &OP_Fx55;
     tableF[0x65] = &OP_Fx65;
 
-    return Chip8{
+    return .{
         .keypad = [_]u8{0} ** (KEY_COUNT),
         .video = [_]u32{0} ** (VIDEO_HEIGHT * VIDEO_WIDTH),
 
         .memory = memory,
         .registers = [_]u8{0} ** (REGISTER_COUNT),
         .index = 0,
-        .pc = @intCast(START_ADDRESS),
+        .pc = START_ADDRESS,
         .delayTimer = 0,
         .soundTimer = 0,
         .stack = [_]u16{0} ** STACK_LEVELS,
         .sp = 0,
         .opcode = 0,
 
-        .prng = std.Random.DefaultPrng.init(seed),
+        .prng = .init(seed),
         .table = table,
         .table0 = table0,
         .table8 = table8,
@@ -148,20 +147,20 @@ pub fn Chip8__init(init: std.process.Init) Chip8 {
     };
 }
 
-pub fn LoadROM(self: *Chip8, init: std.process.Init, filename: [:0]const u8) !void {
-    const file = try std.Io.Dir.cwd().openFile(init.io, filename, .{ .mode = .read_only });
-    defer file.close(init.io);
+pub fn loadROM(self: *Chip8, io: std.Io, filename: [:0]const u8) !void {
+    const file = try std.Io.Dir.cwd().openFile(io, filename, .{ .mode = .read_only });
+    defer file.close(io);
     var i_buffer: [1024]u8 = undefined;
     i_buffer[0] = 0;
-    var reader = file.reader(init.io, &i_buffer);
+    var reader = file.reader(io, &i_buffer);
 
-    const file_stat = try file.stat(init.io);
+    const file_stat = try file.stat(io);
     const file_size = file_stat.size;
 
     _ = try reader.interface.readSliceAll(self.memory[START_ADDRESS .. START_ADDRESS + file_size]);
 }
 
-pub fn Cycle(self: *Chip8) void {
+pub fn cycle(self: *Chip8) void {
     self.opcode = (@as(u16, self.memory[self.pc]) << 8) | (@as(u16, self.memory[self.pc + 1]));
 
     self.pc += 2;

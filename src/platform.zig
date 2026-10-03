@@ -1,7 +1,7 @@
 const Platform = @This();
 const std = @import("std");
 const sdl = @import("sdl3");
-const chip8 = @import("chip8.zig");
+const chip8 = @import("Chip8.zig");
 
 const init_flags: sdl.InitFlags = .{ .video = true };
 
