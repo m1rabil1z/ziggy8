@@ -157,7 +157,7 @@ pub fn loadROM(self: *Chip8, io: std.Io, filename: [:0]const u8) !void {
     const file_stat = try file.stat(io);
     const file_size = file_stat.size;
 
-    _ = try reader.interface.readSliceAll(self.memory[START_ADDRESS .. START_ADDRESS + file_size]);
+    try reader.interface.readSliceAll(self.memory[START_ADDRESS .. START_ADDRESS + file_size]);
 }
 
 pub fn cycle(self: *Chip8) void {
@@ -165,7 +165,7 @@ pub fn cycle(self: *Chip8) void {
 
     self.pc += 2;
 
-    _ = self.table[(self.opcode & 0xF000) >> 12](self);
+    self.table[(self.opcode & 0xF000) >> 12](self);
 
     if (self.delayTimer > 0) {
         self.delayTimer -= 1;
@@ -177,24 +177,22 @@ pub fn cycle(self: *Chip8) void {
 }
 
 fn Table0(self: *Chip8) void {
-    _ = self.table0[self.opcode & 0x000F](self);
+    self.table0[self.opcode & 0x000F](self);
 }
 
 fn Table8(self: *Chip8) void {
-    _ = self.table8[self.opcode & 0x000F](self);
+    self.table8[self.opcode & 0x000F](self);
 }
 
 fn TableE(self: *Chip8) void {
-    _ = self.tableE[self.opcode & 0x000F](self);
+    self.tableE[self.opcode & 0x000F](self);
 }
 
 fn TableF(self: *Chip8) void {
-    _ = self.tableF[self.opcode & 0x00FF](self);
+    self.tableF[self.opcode & 0x00FF](self);
 }
 
-fn OP_NULL(self: *Chip8) void {
-    _ = self;
-}
+fn OP_NULL(_: *Chip8) void {}
 
 fn OP_00E0(self: *Chip8) void {
     @memset(&self.video, 0);
