@@ -1,3 +1,4 @@
 clibs/
 zig-out/
 .zig-cache/
+zig-pkg/

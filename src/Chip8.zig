@@ -502,7 +502,7 @@ fn OP_Fx33(self: *Chip8) void {
 fn OP_Fx55(self: *Chip8) void {
     const Vx: u4 = @truncate(self.opcode >> 8);
 
-    for (0..(Vx + 1)) |i| {
+    for (0..@as(usize, Vx) + 1) |i| {
         self.memory[self.index + i] = self.registers[i];
     }
 
@@ -512,7 +512,7 @@ fn OP_Fx55(self: *Chip8) void {
 fn OP_Fx65(self: *Chip8) void {
     const Vx: u4 = @truncate(self.opcode >> 8);
 
-    for (0..(Vx + 1)) |i| {
+    for (0..@as(usize, Vx) + 1) |i| {
         self.registers[i] = self.memory[self.index + i];
     }
 
